@@ -1,27 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/main"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:gravity="center"
-    android:orientation="vertical">
-    <!-- match_parent (fill_parent) – означает, что элемент
-    займет всю доступную ему в родительском элементе ширину/высоту.-->
+    android:layout_height="match_parent">
+    <!-- FrameLayout предназначен для вывода на экран одного помещенного в него визуального элемента.
+    Если же мы поместим несколько элементов, то они будут накладываться друг на друга
+    FrameLayout — это самый простой вариант ViewGroup, в котором дочерние объекты не организованы каким-то
+    конкретным образом. В этом макете дочерние виды располагаются в соответствии со значением атрибутов
+    android:layout_gravity.-->
     <TextView
         android:id="@+id/question_text_view"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:gravity="center"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="50dp"
         android:padding="24dp"
         tools:text="@string/question_australia" />
-    <!-- wrap_content – ширина/высота элемента будет определяться
-    его содержимым -->
 
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:gravity="center"
+        android:layout_gravity="center_vertical|center_horizontal"
         android:orientation="horizontal">
 
         <Button
@@ -31,7 +30,6 @@
             android:layout_marginHorizontal="5dp"
             android:text="@string/true_button" />
 
-        <!-- + - значит, что мы создаем идентификатор -->
         <Button
             android:id="@+id/false_button"
             android:layout_width="wrap_content"
@@ -43,7 +41,8 @@
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:gravity="center"
+        android:layout_gravity="center"
+        android:layout_marginTop="50dp"
         android:orientation="horizontal">
 
         <ImageButton
@@ -61,20 +60,26 @@
             android:layout_marginHorizontal="5dp"
             android:contentDescription="@string/next_button"
             android:src="@drawable/arrow_right" />
-        <!-- drawablePadding - used for space between image and text. -->
     </LinearLayout>
 
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
-        android:gravity="center"
+        android:layout_gravity="center"
+        android:layout_marginTop="90dp"
         android:orientation="horizontal">
 
         <TextView
             android:id="@+id/answer_count_view"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:gravity="center"/>
+            android:gravity="center" />
     </LinearLayout>
-</LinearLayout>
+
+</FrameLayout><!-- Когда устройство находится в альбомной ориентации,
+    Android использует ресурсы макета из папки
+    res/layout-land. В противном случае он будет использовать
+    ресурсы по умолчанию в каталоге res/layout/
+    Файлы макета должны иметь одно и то же имя,
+    чтобы на них можно было ссылаться с одним и тем же
+    идентификатором ресурса-->
