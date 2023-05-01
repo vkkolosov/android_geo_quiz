@@ -9,9 +9,15 @@ import android.widget.Button
 import android.widget.ImageButton
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelProviders
 import com.google.android.material.snackbar.Snackbar
 
 private const val TAG = "MainActivity"
+private const val KEY_INDEX = "index"
+private const val ANSWER_DATA = "data"
+private const val ANSWER_COUNT = "answer count"
+private const val CORRECT_ANSWER_COUNT = "correct answer count"
 
 class MainActivity : AppCompatActivity() {
     // MainActivity - имя класса
@@ -20,24 +26,27 @@ class MainActivity : AppCompatActivity() {
     // xml - представление
     // data - модель
 
+    //как все работает:
+    //1. Создается список вопросов, туда кидаются айдишники вопросов из strings.xml, и ответы
+    //2. Создается индекс массива
+    //3. При onCreate():
+    //      - устанавливается View activity_main.xml (там заранее прописаны дефолтные значения текста и кнопок)
+    //      - привязываются кнопки, текст, теперь на View будут отображаться изменения на стороне back-end
+    //      - ставятся листенеры на кнопки, которые сверяют индекс и отвечал ли юзер уже на этот вопрос
+    //        в updateQuestion() + общий счетчик
+
     private lateinit var trueButton: Button //lateinit - lazy initialization, так как созданы будут после вызова onCreate
     private lateinit var falseButton: Button //var - variable, val - value = final
     private lateinit var nextButton: ImageButton
     private lateinit var prevButton: ImageButton
     private lateinit var questionTextView: TextView
     private lateinit var answerCountTextView: TextView
-    private var answerCount: Int = 0
-    private var correctAnswerCount: Int = 0
-
-    private val questionBank = listOf(
-        Question(R.string.question_australia, true, null),
-        Question(R.string.question_oceans, true, null),
-        Question(R.string.question_mideast, false, null),
-        Question(R.string.question_africa, false, null),
-        Question(R.string.question_americas, true, null),
-        Question(R.string.question_asia, true, null)
-    )
-    private var currentIndex = 0
+    //ViewModelProvider работает как реестр ViewModel
+    //ViewModel - класс, позволяющий Activity и фрагментам сохранять необходимые им объекты живыми при повороте экрана.
+    //при поворотах экрана, Activity будет пересоздаваться, а объект MyViewModel будет спокойно себе жить в провайдере
+    private val quizViewModel: QuizViewModel by lazy {
+        ViewModelProviders.of(this).get(QuizViewModel::class.java)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // fun - функция
@@ -48,6 +57,23 @@ class MainActivity : AppCompatActivity() {
         Log.d(TAG, "onCreate(Bundle?) called")
         setContentView(R.layout.activity_main) //предоставление пользовательского интерфейса для Activity,
         // R - хранилище id для виджетов (автогенерируемое)
+
+        //Блок синхронизации с savedInstanceState
+        val currentIndex = savedInstanceState?.getInt(KEY_INDEX, 0) ?: 0 //?: – оператор "элвис", 0, если пришел null
+        val questionBank = savedInstanceState?.getParcelableArrayList<Question>(ANSWER_DATA) ?: arrayListOf(
+            Question(R.string.question_australia, true, null),
+            Question(R.string.question_oceans, true, null),
+            Question(R.string.question_mideast, false, null),
+            Question(R.string.question_africa, false, null),
+            Question(R.string.question_americas, true, null),
+            Question(R.string.question_asia, true, null)
+        )
+        val answerCount = savedInstanceState?.getInt(ANSWER_COUNT, 0) ?: 0
+        val correctAnswerCount = savedInstanceState?.getInt(CORRECT_ANSWER_COUNT, 0) ?: 0
+        quizViewModel.currentIndex = currentIndex
+        quizViewModel.questionBank = questionBank as ArrayList<Question> /* = java.util.ArrayList<com.bignerdranch.android.geomain.Question> */
+        quizViewModel.answerCount = answerCount
+        quizViewModel.correctAnswerCount = correctAnswerCount
 
         trueButton = findViewById(R.id.true_button) //там все наследуется от View = виджет
         falseButton = findViewById(R.id.false_button)
@@ -60,7 +86,7 @@ class MainActivity : AppCompatActivity() {
 
         trueButton.setOnClickListener { view: View ->
             checkAnswer(true, view)
-            answerCount++
+            quizViewModel.answerCount++
             checkAnswersDone()
             /*
             var toast: Toast = Toast.makeText(this, R.string.correct_toast, Toast.LENGTH_SHORT)
@@ -72,30 +98,31 @@ class MainActivity : AppCompatActivity() {
         }
         falseButton.setOnClickListener { view: View ->
             checkAnswer(false, view)
-            answerCount++
+            quizViewModel.answerCount++
             checkAnswersDone()
         }
 
         nextButton.setOnClickListener {
-            currentIndex = (currentIndex + 1) % questionBank.size //0 раз с остатком в currentIndex
+            quizViewModel.currentIndex = (quizViewModel.currentIndex + 1) % quizViewModel.questionBank.size //0 раз с остатком в currentIndex
             // пока не будет 1 с остатком 0
             updateQuestion()
         }
 
         prevButton.setOnClickListener {
-            if (currentIndex == 0) {
-                currentIndex = questionBank.size - 1
+            if (quizViewModel.currentIndex == 0) {
+                quizViewModel.currentIndex = quizViewModel.questionBank.size - 1
             } else {
-                currentIndex -= 1
+                quizViewModel.currentIndex -= 1
             }
             updateQuestion()
         }
 
         questionTextView.setOnClickListener {
-            currentIndex = (currentIndex + 1) % questionBank.size
+            quizViewModel.currentIndex = (quizViewModel.currentIndex + 1) % quizViewModel.questionBank.size
             updateQuestion()
         }
         updateQuestion() //установка текста при инициализации
+        checkAnswersDone()
     }
 
     override fun onStart() {
@@ -112,6 +139,18 @@ class MainActivity : AppCompatActivity() {
         super.onPause()
         Log.d(TAG, "onPause() called")
     }
+    //ОС может просто закрыть низкоприоритетные приложения при недостатке памяти
+    //потому нужно сохранять состояния
+    //Don’tkeepactivities позволяет это затестить
+    override fun onSaveInstanceState(savedInstanceState: Bundle)
+    {
+        super.onSaveInstanceState(savedInstanceState)
+        Log.i(TAG, "onSaveInstanceState")
+        savedInstanceState.putInt(KEY_INDEX, quizViewModel.currentIndex)
+        savedInstanceState.putParcelableArrayList(ANSWER_DATA, quizViewModel.questionBank)
+        savedInstanceState.putInt(ANSWER_COUNT, quizViewModel.answerCount)
+        savedInstanceState.putInt(CORRECT_ANSWER_COUNT, quizViewModel.correctAnswerCount)
+    }
 
     override fun onStop() {
         super.onStop()
@@ -124,24 +163,24 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateQuestion() {
-        val questionTextResId = questionBank[currentIndex].textResId //вытаскивает value textResId
+        val questionTextResId = quizViewModel.questionBank[quizViewModel.currentIndex].textResId //вытаскивает value textResId
         questionTextView.setText(questionTextResId) //установка текста в виджет в зависимости от значения итератора списка вопросов
         setDefaultButtons()
-        if (questionBank[currentIndex].userAnswer != null) {
+        if (quizViewModel.questionBank[quizViewModel.currentIndex].userAnswer != null) {
             setButtons(
-                questionBank[currentIndex].userAnswer == true,
-                questionBank[currentIndex].answer
+                quizViewModel.questionBank[quizViewModel.currentIndex].userAnswer == true,
+                quizViewModel.questionBank[quizViewModel.currentIndex].answer
             )
         }
     }
 
     private fun checkAnswer(userAnswer: Boolean, view: View) {
         //userAnswer = false from falseButton, true from trueButton
-        val correctAnswer = questionBank[currentIndex].answer //чекаем булеан на текущий вопрос
+        val correctAnswer = quizViewModel.questionBank[quizViewModel.currentIndex].answer //чекаем булеан на текущий вопрос
 
         if (userAnswer == correctAnswer) {
             Snackbar.make(view, R.string.correct_toast, Snackbar.LENGTH_SHORT).show()
-            correctAnswerCount++
+            quizViewModel.correctAnswerCount++
         } else {
             Snackbar.make(view, R.string.incorrect_toast, Snackbar.LENGTH_SHORT).show()
         }
@@ -161,7 +200,7 @@ class MainActivity : AppCompatActivity() {
         }
         falseButton.isEnabled = false
         trueButton.isEnabled = false
-        questionBank[currentIndex].userAnswer = userAnswer;
+        quizViewModel.questionBank[quizViewModel.currentIndex].userAnswer = userAnswer;
     }
 
     private fun setDefaultButtons() {
@@ -174,8 +213,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkAnswersDone() {
-        if (answerCount == questionBank.size) {
-            answerCountTextView.text = "You done " + correctAnswerCount + "/" + questionBank.size + "!"
+        if (quizViewModel.answerCount == quizViewModel.questionBank.size) {
+            answerCountTextView.text = "You done " + quizViewModel.correctAnswerCount + "/" + quizViewModel.questionBank.size + "!"
         }
     }
 
