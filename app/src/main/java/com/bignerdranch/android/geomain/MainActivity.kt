@@ -1,8 +1,11 @@
 package com.bignerdranch.android.geomain
 
+import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.ActivityOptions
 import android.content.Intent
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -51,6 +54,7 @@ class MainActivity : AppCompatActivity() {
         ViewModelProviders.of(this).get(QuizViewModel::class.java)
     }
 
+    @SuppressLint("RestrictedApi")
     override fun onCreate(savedInstanceState: Bundle?) {
         // fun - функция
         // savedInstanceState - аргумет
@@ -133,18 +137,29 @@ class MainActivity : AppCompatActivity() {
         updateQuestion() //установка текста при инициализации
         checkAnswersDone()
 
-        cheatButton.setOnClickListener {
+        cheatButton.setOnClickListener { view ->
             /*
             //это явный Intent через ОС
             val intent = Intent(this, CheatActivity::class.java)
             */
             val answerIsTrue = quizViewModel.questionBank[quizViewModel.currentIndex].answer
             val intent = CheatActivity.newIntent(this@MainActivity, answerIsTrue)
-            //startActivity(intent) //Передается задача ОС (Activity manager), она вызывает экземпляр CheatActivity
-            startActivityForResult(
-                intent,
-                REQUEST_CODE_CHEAT
-            ) //MainActivity становится «родителем» для NameActivity
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val options =
+                    ActivityOptions.makeClipRevealAnimation(view, 0, 0, view.width, view.height)
+                //startActivity(intent) //Передается задача ОС (Activity manager), она вызывает экземпляр CheatActivity
+                startActivityForResult(
+                    intent,
+                    REQUEST_CODE_CHEAT,
+                    options.toBundle()
+                ) //MainActivity становится «родителем» для NameActivity
+            } else {
+                startActivityForResult(
+                    intent,
+                    REQUEST_CODE_CHEAT
+                )
+            }
 
         }
     }
