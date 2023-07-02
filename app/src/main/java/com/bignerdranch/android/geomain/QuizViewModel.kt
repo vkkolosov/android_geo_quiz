@@ -13,6 +13,7 @@ class QuizViewModel : ViewModel(){
 
     var answerCount: Int = 0
     var correctAnswerCount: Int = 0
+    var isCheater = false
 
     var questionBank = arrayListOf(
         Question(R.string.question_australia, true, null),

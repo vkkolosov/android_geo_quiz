@@ -1,6 +1,7 @@
 package com.bignerdranch.android.geomain
 
-import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
@@ -9,7 +10,6 @@ import android.widget.Button
 import android.widget.ImageButton
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProviders
 import com.google.android.material.snackbar.Snackbar
 
@@ -18,6 +18,7 @@ private const val KEY_INDEX = "index"
 private const val ANSWER_DATA = "data"
 private const val ANSWER_COUNT = "answer count"
 private const val CORRECT_ANSWER_COUNT = "correct answer count"
+private const val REQUEST_CODE_CHEAT = 0
 
 class MainActivity : AppCompatActivity() {
     // MainActivity - имя класса
@@ -41,6 +42,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var prevButton: ImageButton
     private lateinit var questionTextView: TextView
     private lateinit var answerCountTextView: TextView
+    private lateinit var cheatButton: Button
+
     //ViewModelProvider работает как реестр ViewModel
     //ViewModel - класс, позволяющий Activity и фрагментам сохранять необходимые им объекты живыми при повороте экрана.
     //при поворотах экрана, Activity будет пересоздаваться, а объект MyViewModel будет спокойно себе жить в провайдере
@@ -59,8 +62,10 @@ class MainActivity : AppCompatActivity() {
         // R - хранилище id для виджетов (автогенерируемое)
 
         //Блок синхронизации с savedInstanceState
-        val currentIndex = savedInstanceState?.getInt(KEY_INDEX, 0) ?: 0 //?: – оператор "элвис", 0, если пришел null
-        val questionBank = savedInstanceState?.getParcelableArrayList<Question>(ANSWER_DATA) ?: arrayListOf(
+        val currentIndex = savedInstanceState?.getInt(KEY_INDEX, 0)
+            ?: 0 //?: – оператор "элвис", 0, если пришел null
+        //возможно, что это вообще не нужно, надо потестить
+        val questionBank = savedInstanceState?.getParcelableArrayList(ANSWER_DATA) ?: arrayListOf(
             Question(R.string.question_australia, true, null),
             Question(R.string.question_oceans, true, null),
             Question(R.string.question_mideast, false, null),
@@ -71,14 +76,16 @@ class MainActivity : AppCompatActivity() {
         val answerCount = savedInstanceState?.getInt(ANSWER_COUNT, 0) ?: 0
         val correctAnswerCount = savedInstanceState?.getInt(CORRECT_ANSWER_COUNT, 0) ?: 0
         quizViewModel.currentIndex = currentIndex
-        quizViewModel.questionBank = questionBank as ArrayList<Question> /* = java.util.ArrayList<com.bignerdranch.android.geomain.Question> */
+        quizViewModel.questionBank = questionBank
         quizViewModel.answerCount = answerCount
         quizViewModel.correctAnswerCount = correctAnswerCount
 
         trueButton = findViewById(R.id.true_button) //там все наследуется от View = виджет
         falseButton = findViewById(R.id.false_button)
-        nextButton = findViewById(R.id.next_button) //находим представления и связываем с объектами контроллера
+        nextButton =
+            findViewById(R.id.next_button) //находим представления и связываем с объектами контроллера
         prevButton = findViewById(R.id.prev_button)
+        cheatButton = findViewById(R.id.cheat_button)
         //View <- Controller <- Model
 
         questionTextView = findViewById(R.id.question_text_view)
@@ -103,7 +110,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         nextButton.setOnClickListener {
-            quizViewModel.currentIndex = (quizViewModel.currentIndex + 1) % quizViewModel.questionBank.size //0 раз с остатком в currentIndex
+            quizViewModel.currentIndex =
+                (quizViewModel.currentIndex + 1) % quizViewModel.questionBank.size //0 раз с остатком в currentIndex
             // пока не будет 1 с остатком 0
             updateQuestion()
         }
@@ -118,11 +126,27 @@ class MainActivity : AppCompatActivity() {
         }
 
         questionTextView.setOnClickListener {
-            quizViewModel.currentIndex = (quizViewModel.currentIndex + 1) % quizViewModel.questionBank.size
+            quizViewModel.currentIndex =
+                (quizViewModel.currentIndex + 1) % quizViewModel.questionBank.size
             updateQuestion()
         }
         updateQuestion() //установка текста при инициализации
         checkAnswersDone()
+
+        cheatButton.setOnClickListener {
+            /*
+            //это явный Intent через ОС
+            val intent = Intent(this, CheatActivity::class.java)
+            */
+            val answerIsTrue = quizViewModel.questionBank[quizViewModel.currentIndex].answer
+            val intent = CheatActivity.newIntent(this@MainActivity, answerIsTrue)
+            //startActivity(intent) //Передается задача ОС (Activity manager), она вызывает экземпляр CheatActivity
+            startActivityForResult(
+                intent,
+                REQUEST_CODE_CHEAT
+            ) //MainActivity становится «родителем» для NameActivity
+
+        }
     }
 
     override fun onStart() {
@@ -139,11 +163,11 @@ class MainActivity : AppCompatActivity() {
         super.onPause()
         Log.d(TAG, "onPause() called")
     }
+
     //ОС может просто закрыть низкоприоритетные приложения при недостатке памяти
     //потому нужно сохранять состояния
     //Don’tkeepactivities позволяет это затестить
-    override fun onSaveInstanceState(savedInstanceState: Bundle)
-    {
+    override fun onSaveInstanceState(savedInstanceState: Bundle) {
         super.onSaveInstanceState(savedInstanceState)
         Log.i(TAG, "onSaveInstanceState")
         savedInstanceState.putInt(KEY_INDEX, quizViewModel.currentIndex)
@@ -162,8 +186,21 @@ class MainActivity : AppCompatActivity() {
         Log.d(TAG, "onDestroy() called")
     }
 
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        if (resultCode != Activity.RESULT_OK) {
+            return
+        }
+
+        if (requestCode == REQUEST_CODE_CHEAT) {
+            quizViewModel.isCheater = data?.getBooleanExtra(EXTRA_ANSWER_SHOWN, false) ?: false
+        }
+    }
+
     private fun updateQuestion() {
-        val questionTextResId = quizViewModel.questionBank[quizViewModel.currentIndex].textResId //вытаскивает value textResId
+        val questionTextResId =
+            quizViewModel.questionBank[quizViewModel.currentIndex].textResId //вытаскивает value textResId
         questionTextView.setText(questionTextResId) //установка текста в виджет в зависимости от значения итератора списка вопросов
         setDefaultButtons()
         if (quizViewModel.questionBank[quizViewModel.currentIndex].userAnswer != null) {
@@ -172,18 +209,20 @@ class MainActivity : AppCompatActivity() {
                 quizViewModel.questionBank[quizViewModel.currentIndex].answer
             )
         }
+        quizViewModel.isCheater = false
     }
 
     private fun checkAnswer(userAnswer: Boolean, view: View) {
         //userAnswer = false from falseButton, true from trueButton
-        val correctAnswer = quizViewModel.questionBank[quizViewModel.currentIndex].answer //чекаем булеан на текущий вопрос
+        val correctAnswer =
+            quizViewModel.questionBank[quizViewModel.currentIndex].answer //чекаем булеан на текущий вопрос
 
-        if (userAnswer == correctAnswer) {
-            Snackbar.make(view, R.string.correct_toast, Snackbar.LENGTH_SHORT).show()
-            quizViewModel.correctAnswerCount++
-        } else {
-            Snackbar.make(view, R.string.incorrect_toast, Snackbar.LENGTH_SHORT).show()
+        val messageResId = when {
+            quizViewModel.isCheater -> R.string.judgment_toast
+            userAnswer == correctAnswer -> R.string.correct_toast
+            else -> R.string.incorrect_toast
         }
+        Snackbar.make(view, messageResId, Snackbar.LENGTH_SHORT).show()
 
         setButtons(userAnswer, correctAnswer)
     }
@@ -200,7 +239,7 @@ class MainActivity : AppCompatActivity() {
         }
         falseButton.isEnabled = false
         trueButton.isEnabled = false
-        quizViewModel.questionBank[quizViewModel.currentIndex].userAnswer = userAnswer;
+        quizViewModel.questionBank[quizViewModel.currentIndex].userAnswer = userAnswer
     }
 
     private fun setDefaultButtons() {
@@ -214,7 +253,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkAnswersDone() {
         if (quizViewModel.answerCount == quizViewModel.questionBank.size) {
-            answerCountTextView.text = "You done " + quizViewModel.correctAnswerCount + "/" + quizViewModel.questionBank.size + "!"
+            answerCountTextView.text =
+                "You done " + quizViewModel.correctAnswerCount + "/" + quizViewModel.questionBank.size + "!"
         }
     }
 
