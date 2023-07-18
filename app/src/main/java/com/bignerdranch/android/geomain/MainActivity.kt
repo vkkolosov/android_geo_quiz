@@ -239,6 +239,8 @@ class MainActivity : AppCompatActivity() {
         }
         Snackbar.make(view, messageResId, Snackbar.LENGTH_SHORT).show()
 
+        if (userAnswer == correctAnswer) quizViewModel.correctAnswerCount++
+
         setButtons(userAnswer, correctAnswer)
     }
 
